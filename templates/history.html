@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SmartDoc NLP - Analysis History</title>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <div class="glass-bg"></div>
+    <div class="app-container">
+        
+        <!-- Header -->
+        <header class="app-header">
+            <div class="logo">
+                <i class="fa-solid fa-brain-circuit brain-icon"></i>
+                <div class="brand">
+                    <h1>SmartDoc NLP</h1>
+                    <p class="subtitle">Intelligent Local Document Analysis System</p>
+                </div>
+            </div>
+            <nav class="nav-links">
+                <a href="{{ url_for('index') }}"><i class="fa-solid fa-home"></i> Home</a>
+                <a href="{{ url_for('compare') }}"><i class="fa-solid fa-code-compare"></i> Compare Docs</a>
+                <a href="{{ url_for('history') }}" class="active"><i class="fa-solid fa-history"></i> History</a>
+                <a href="{{ url_for('logout') }}" class="btn-logout"><i class="fa-solid fa-right-from-bracket"></i> Logout</a>
+            </nav>
+        </header>
+
+        <!-- Main Content Area -->
+        <main class="main-content">
+            
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    <div class="alerts-container">
+                        {% for category, message in messages %}
+                            <div class="alert alert-{{ category }}">
+                                <i class="fa-solid {% if category == 'error' %}fa-circle-xmark{% else %}fa-circle-check{% endif %}"></i>
+                                <span>{{ message }}</span>
+                                <button class="close-alert" onclick="this.parentElement.remove()">&times;</button>
+                            </div>
+                        {% endfor %}
+                    </div>
+                {% endif %}
+            {% endwith %}
+
+            <div class="history-header flex-between mb-4">
+                <div>
+                    <h2><i class="fa-solid fa-clock-rotate-left header-icon text-indigo"></i> Analysis History</h2>
+                    <p class="text-muted">Review previous local NLP document analyses, risk scores, and download PDF or DOCX reports.</p>
+                </div>
+                {% if history %}
+                    <form action="{{ url_for('clear_history') }}" method="POST" onsubmit="return confirmAllClear()">
+                        <button type="submit" class="btn btn-danger btn-sm">
+                            <i class="fa-solid fa-dumpster-fire"></i> Clear All History
+                        </button>
+                    </form>
+                {% endif %}
+            </div>
+
+            <!-- History List Card -->
+            <div class="card history-card">
+                {% if history %}
+                    <div class="table-wrapper">
+                        <table class="data-table history-table">
+                            <thead>
+                                <tr>
+                                    <th>Document Name</th>
+                                    <th>Category</th>
+                                    <th>Date Analyzed</th>
+                                    <th>Risk Level</th>
+                                    <th>Compression</th>
+                                    <th class="actions-col">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for item in history %}
+                                    <tr>
+                                        <td class="font-semibold text-white doc-name-col">
+                                            <i class="fa-regular {% if 'Pasted' in item.document_name %}fa-clipboard-list text-indigo{% else %}fa-file-lines text-blue{% endif %} mr-2"></i>
+                                            {{ item.document_name }}
+                                        </td>
+                                        <td><span class="category-badge cat-type-badge">{{ item.category }}</span></td>
+                                        <td class="text-muted text-sm">{{ item.created_at }}</td>
+                                        <td>
+                                            <span class="risk-badge risk-badge-sm risk-{{ item.vulnerability_level | lower }}">
+                                                {{ item.vulnerability_level }}
+                                            </span>
+                                        </td>
+                                        <td class="font-bold text-purple text-center">{{ item.compression_percentage }}%</td>
+                                        <td class="actions-col">
+                                            <div class="actions-btn-group">
+                                                <a href="{{ url_for('results', analysis_id=item.id) }}" class="btn btn-sm btn-info" title="View Full Dashboard">
+                                                    <i class="fa-solid fa-chart-line"></i> View
+                                                </a>
+                                                <a href="{{ url_for('download_pdf_report', analysis_id=item.id) }}" class="btn btn-sm btn-secondary" title="Download PDF Report">
+                                                    <i class="fa-solid fa-file-pdf text-red"></i> PDF
+                                                </a>
+                                                <a href="{{ url_for('download_docx_report', analysis_id=item.id) }}" class="btn btn-sm btn-secondary" title="Download DOCX Report">
+                                                    <i class="fa-solid fa-file-word text-blue"></i> DOCX
+                                                </a>
+                                                <form action="{{ url_for('delete_history', analysis_id=item.id) }}" method="POST" style="display:inline;" onsubmit="return confirmDelete()">
+                                                    <button type="submit" class="btn btn-sm btn-danger icon-only" title="Delete Record">
+                                                        <i class="fa-regular fa-trash-can"></i>
+                                                    </button>
+                                                </form>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <div class="empty-state">
+                        <i class="fa-solid fa-database text-muted"></i>
+                        <h3>No History Found</h3>
+                        <p>You haven't analyzed any documents yet. Upload a PDF, DOCX, or text file to start your first analysis!</p>
+                        <a href="{{ url_for('index') }}" class="btn btn-primary mt-3">
+                            <i class="fa-solid fa-arrow-left"></i> Start Analysis
+                        </a>
+                    </div>
+                {% endif %}
+            </div>
+
+        </main>
+
+        <footer class="app-footer">
+            <p>&copy; 2026 SmartDoc NLP — Intelligent Local Document Analysis System. 100% Offline & Secure.</p>
+        </footer>
+
+    </div>
+
+    <script>
+        function confirmDelete() {
+            return confirm("Are you sure you want to delete this document record? This cannot be undone.");
+        }
+        function confirmAllClear() {
+            return confirm("WARNING: You are about to clear all document analysis history for your account. Proceed?");
+        }
+    </script>
+</body>
+</html>

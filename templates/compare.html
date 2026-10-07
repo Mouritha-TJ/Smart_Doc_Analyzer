@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Compare Documents - SmartDoc NLP</title>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <div class="glass-bg"></div>
+    <div class="app-container">
+        
+        <!-- Header -->
+        <header class="app-header">
+            <div class="logo">
+                <i class="fa-solid fa-brain-circuit brain-icon"></i>
+                <div class="brand">
+                    <h1>SmartDoc NLP</h1>
+                    <p class="subtitle">Intelligent Local Document Analysis System</p>
+                </div>
+            </div>
+            <nav class="nav-links">
+                <a href="{{ url_for('index') }}"><i class="fa-solid fa-home"></i> Home</a>
+                <a href="{{ url_for('compare') }}" class="active"><i class="fa-solid fa-code-compare"></i> Compare Docs</a>
+                <a href="{{ url_for('history') }}"><i class="fa-solid fa-history"></i> History</a>
+                <a href="{{ url_for('logout') }}" class="btn-logout"><i class="fa-solid fa-right-from-bracket"></i> Logout</a>
+            </nav>
+        </header>
+
+        <main class="main-content">
+            
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    <div class="alerts-container">
+                        {% for category, message in messages %}
+                            <div class="alert alert-{{ category }}">
+                                <i class="fa-solid {% if category == 'error' %}fa-circle-xmark{% else %}fa-circle-check{% endif %}"></i>
+                                <span>{{ message }}</span>
+                                <button class="close-alert" onclick="this.parentElement.remove()">&times;</button>
+                            </div>
+                        {% endfor %}
+                    </div>
+                {% endif %}
+            {% endwith %}
+
+            <div class="history-header flex-between mb-4">
+                <div>
+                    <h2><i class="fa-solid fa-code-compare header-icon text-indigo"></i> Document Comparison Tool</h2>
+                    <p class="text-muted">Compare two uploaded documents using TF-IDF cosine similarity, shared vs. unique keywords, themes, and entity matrices.</p>
+                </div>
+            </div>
+
+            <!-- Select Documents to Compare Form -->
+            <div class="card mb-4">
+                <form action="{{ url_for('compare') }}" method="POST" class="compare-select-form">
+                    <div class="compare-select-grid">
+                        <div class="form-group">
+                            <label for="doc_a_id"><i class="fa-solid fa-file-lines text-blue"></i> Document A:</label>
+                            <div class="custom-select-wrapper">
+                                <select id="doc_a_id" name="doc_a_id" required>
+                                    <option value="" disabled selected>-- Select Document A --</option>
+                                    {% for doc in user_analyses %}
+                                        <option value="{{ doc.id }}">{{ doc.filename }} ({{ doc.created_at }})</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="compare-vs-icon">
+                            <i class="fa-solid fa-right-left"></i>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="doc_b_id"><i class="fa-solid fa-file-lines text-purple"></i> Document B:</label>
+                            <div class="custom-select-wrapper">
+                                <select id="doc_b_id" name="doc_b_id" required>
+                                    <option value="" disabled selected>-- Select Document B --</option>
+                                    {% for doc in user_analyses %}
+                                        <option value="{{ doc.id }}">{{ doc.filename }} ({{ doc.created_at }})</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="form-actions mt-3">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fa-solid fa-calculator"></i> Run Comparison Matrix
+                        </button>
+                    </div>
+                </form>
+            </div>
+
+            <!-- Comparison Results Dashboard (Rendered if comp_result exists) -->
+            {% if comp_result %}
+                <div class="dashboard-grid">
+                    
+                    <!-- Similarity Score Card -->
+                    <div class="dashboard-card card span-12 text-center">
+                        <div class="card-header justify-center">
+                            <h3><i class="fa-solid fa-percent header-icon text-indigo"></i> Content Similarity Score</h3>
+                        </div>
+                        <div class="card-body">
+                            <div class="similarity-gauge-large">
+                                <span class="sim-score-num">{{ comp_result.similarity_percentage }}%</span>
+                                <span class="sim-label">Cosine Similarity Match</span>
+                            </div>
+                            <div class="sim-meta-row mt-3">
+                                <div class="sim-meta-item">
+                                    <span class="text-muted">Doc A:</span> <strong>{{ comp_result.doc_a_name }}</strong> ({{ comp_result.doc_a_word_count }} words)
+                                </div>
+                                <div class="sim-meta-item">
+                                    <span class="text-muted">Doc B:</span> <strong>{{ comp_result.doc_b_name }}</strong> ({{ comp_result.doc_b_word_count }} words)
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Category & Sentiment Comparison -->
+                    <div class="dashboard-card card span-6">
+                        <div class="card-header">
+                            <h3><i class="fa-solid fa-folder-tree header-icon text-purple"></i> Category & Sentiment Matrix</h3>
+                        </div>
+                        <div class="card-body">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>Metric</th>
+                                        <th>{{ comp_result.doc_a_name }}</th>
+                                        <th>{{ comp_result.doc_b_name }}</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td><strong>Category</strong></td>
+                                        <td><span class="category-badge cat-type-badge">{{ comp_result.doc_a_category }}</span></td>
+                                        <td><span class="category-badge cat-type-badge">{{ comp_result.doc_b_category }}</span></td>
+                                    </tr>
+                                    <tr>
+                                        <td><strong>Sentiment</strong></td>
+                                        <td>{{ comp_result.sentiment.doc_a }}</td>
+                                        <td>{{ comp_result.sentiment.doc_b }}</td>
+                                    </tr>
+                                    <tr>
+                                        <td><strong>Flesch Readability</strong></td>
+                                        <td>{{ comp_result.readability.doc_a_ease }}/100</td>
+                                        <td>{{ comp_result.readability.doc_b_ease }}/100</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- Shared & Unique Themes -->
+                    <div class="dashboard-card card span-6">
+                        <div class="card-header">
+                            <h3><i class="fa-solid fa-lightbulb header-icon text-yellow"></i> Themes Comparison</h3>
+                        </div>
+                        <div class="card-body">
+                            <div class="comp-box mb-2">
+                                <h4 class="text-success"><i class="fa-solid fa-check-double"></i> Shared Themes:</h4>
+                                <p>{{ comp_result.themes.common | join(', ') or 'No identical shared themes.' }}</p>
+                            </div>
+                            <div class="comp-box mb-2">
+                                <h4 class="text-blue"><i class="fa-solid fa-file"></i> Unique to Document A:</h4>
+                                <p>{{ comp_result.themes.unique_a | join(', ') or 'None' }}</p>
+                            </div>
+                            <div class="comp-box">
+                                <h4 class="text-purple"><i class="fa-solid fa-file"></i> Unique to Document B:</h4>
+                                <p>{{ comp_result.themes.unique_b | join(', ') or 'None' }}</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Keywords Comparison -->
+                    <div class="dashboard-card card span-6">
+                        <div class="card-header">
+                            <h3><i class="fa-solid fa-tags header-icon text-blue"></i> Keyphrases Matrix</h3>
+                        </div>
+                        <div class="card-body">
+                            <div class="comp-box mb-2">
+                                <h4 class="text-success">Shared Terms:</h4>
+                                <div class="keywords-tags-container">
+                                    {% for kw in comp_result.keywords.common %}
+                                        <span class="tag-badge">{{ kw }}</span>
+                                    {% else %}
+                                        <span class="text-muted">No shared keyphrases.</span>
+                                    {% endfor %}
+                                </div>
+                            </div>
+                            <div class="comp-box mb-2">
+                                <h4 class="text-blue">Only in {{ comp_result.doc_a_name }}:</h4>
+                                <div class="keywords-tags-container">
+                                    {% for kw in comp_result.keywords.unique_a %}
+                                        <span class="tag-badge">{{ kw }}</span>
+                                    {% endfor %}
+                                </div>
+                            </div>
+                            <div class="comp-box">
+                                <h4 class="text-purple">Only in {{ comp_result.doc_b_name }}:</h4>
+                                <div class="keywords-tags-container">
+                                    {% for kw in comp_result.keywords.unique_b %}
+                                        <span class="tag-badge">{{ kw }}</span>
+                                    {% endfor %}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Entities Comparison -->
+                    <div class="dashboard-card card span-6">
+                        <div class="card-header">
+                            <h3><i class="fa-solid fa-address-book header-icon text-cyan"></i> Entities Matrix</h3>
+                        </div>
+                        <div class="card-body">
+                            <div class="comp-box mb-2">
+                                <h4 class="text-success">Shared Named Entities:</h4>
+                                <p>{{ comp_result.entities.common | join(', ') or 'No shared named entities.' }}</p>
+                            </div>
+                            <div class="comp-box mb-2">
+                                <h4 class="text-blue">Only in {{ comp_result.doc_a_name }}:</h4>
+                                <p>{{ comp_result.entities.unique_a | join(', ') or 'None' }}</p>
+                            </div>
+                            <div class="comp-box">
+                                <h4 class="text-purple">Only in {{ comp_result.doc_b_name }}:</h4>
+                                <p>{{ comp_result.entities.unique_b | join(', ') or 'None' }}</p>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+            {% endif %}
+
+        </main>
+
+        <footer class="app-footer">
+            <p>&copy; 2026 SmartDoc NLP — Intelligent Local Document Analysis System. 100% Offline & Secure.</p>
+        </footer>
+
+    </div>
+</body>
+</html>

@@ -1,0 +1,489 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SmartDoc NLP — {{ analysis.document_name }}</title>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <div class="glass-bg"></div>
+    <div class="app-container">
+        
+        <!-- Header -->
+        <header class="app-header">
+            <div class="logo">
+                <i class="fa-solid fa-brain-circuit brain-icon"></i>
+                <div class="brand">
+                    <h1>SmartDoc NLP</h1>
+                    <p class="subtitle">Intelligent Local Document Analysis System</p>
+                </div>
+            </div>
+            <nav class="nav-links">
+                <a href="{{ url_for('index') }}"><i class="fa-solid fa-home"></i> Home</a>
+                <a href="{{ url_for('compare') }}"><i class="fa-solid fa-code-compare"></i> Compare Docs</a>
+                <a href="{{ url_for('history') }}"><i class="fa-solid fa-history"></i> History</a>
+                <a href="{{ url_for('logout') }}" class="btn-logout"><i class="fa-solid fa-right-from-bracket"></i> Logout</a>
+            </nav>
+        </header>
+
+        <main class="main-content">
+            
+            <!-- Document Title Bar -->
+            <div class="results-meta card">
+                <div class="meta-info">
+                    <div class="meta-badges">
+                        <span class="category-badge cat-type-badge"><i class="fa-solid fa-folder-open"></i> {{ analysis.classification.category }}</span>
+                        <span class="confidence-tag">Confidence: {{ analysis.classification.confidence }}%</span>
+                    </div>
+                    <div class="doc-title-container mt-2">
+                        <span class="doc-analysis-label"><i class="fa-solid fa-file-lines"></i> DOCUMENT ANALYSIS</span>
+                        <h1 class="doc-title">📄 {{ analysis.document_name }}</h1>
+                    </div>
+                    <span class="meta-date"><i class="fa-solid fa-calendar-days"></i> Analyzed on: {{ analysis.created_at }}</span>
+                </div>
+                <div class="meta-actions">
+                    <a href="{{ url_for('download_pdf_report', analysis_id=analysis.id) }}" class="btn btn-primary btn-sm">
+                        <i class="fa-solid fa-file-pdf"></i> Download PDF
+                    </a>
+                    <a href="{{ url_for('download_docx_report', analysis_id=analysis.id) }}" class="btn btn-secondary btn-sm">
+                        <i class="fa-solid fa-file-word"></i> Download DOCX
+                    </a>
+                    <a href="{{ url_for('index') }}" class="btn btn-info btn-sm">
+                        <i class="fa-solid fa-plus"></i> Analyze New
+                    </a>
+                </div>
+            </div>
+
+            <div class="dashboard-grid">
+                
+                <!-- 1. Summary Card -->
+                <div class="dashboard-card card span-8" id="summary-card">
+                    <div class="card-header flex-between">
+                        <h3><i class="fa-solid fa-align-left header-icon text-indigo"></i> Summary</h3>
+                        <div class="header-controls">
+                            <!-- Copy Button -->
+                            <button class="icon-btn" onclick="copySummary()" title="Copy summary">
+                                <i class="fa-regular fa-copy" id="copy-icon"></i> <span id="copy-text">Copy</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Summary Level Pills -->
+                    <div class="summary-level-bar">
+                        <span class="level-label"><i class="fa-solid fa-sliders"></i> Summary Level:</span>
+                        <div class="level-pills">
+                            <button type="button" class="level-pill {% if analysis.summary_level == 'very_short' %}active{% endif %}" 
+                                    onclick="changeSummaryLevel({{ analysis.id }}, 'very_short', this)">Very Short</button>
+                            <button type="button" class="level-pill {% if analysis.summary_level == 'short' %}active{% endif %}" 
+                                    onclick="changeSummaryLevel({{ analysis.id }}, 'short', this)">Short</button>
+                            <button type="button" class="level-pill {% if analysis.summary_level in ['medium', None] %}active{% endif %}" 
+                                    onclick="changeSummaryLevel({{ analysis.id }}, 'medium', this)">Medium</button>
+                            <button type="button" class="level-pill {% if analysis.summary_level == 'detailed' %}active{% endif %}" 
+                                    onclick="changeSummaryLevel({{ analysis.id }}, 'detailed', this)">Detailed</button>
+                        </div>
+                    </div>
+
+                    <!-- Summary Content -->
+                    <div class="card-body mt-2">
+                        <div id="summary-loading" class="summary-loading-indicator" style="display:none;">
+                            <i class="fa-solid fa-spinner fa-spin"></i> Generating summary...
+                        </div>
+                        <div id="summary-error" class="summary-error-msg" style="display:none;">
+                            <i class="fa-solid fa-triangle-exclamation"></i> Unable to generate the summary. Please try again.
+                        </div>
+                        <p class="summary-text" id="raw-summary-content">{{ analysis.summary }}</p>
+                    </div>
+                </div>
+
+                <!-- 2. Security & Risk Card -->
+                <div class="dashboard-card card span-4" id="vulnerability-card">
+                    <div class="card-header">
+                        <h3><i class="fa-solid fa-shield-halved header-icon text-cyan"></i> Security &amp; Risk Level</h3>
+                    </div>
+                    <div class="card-body">
+                        <div class="risk-badge-wrapper text-center">
+                            <span class="risk-badge risk-{{ analysis.vulnerability.level | lower }}">
+                                {{ analysis.vulnerability.level }}
+                            </span>
+                            <div class="risk-score-sub mt-2">
+                                Risk Score: <strong>{{ analysis.vulnerability.score }}/100</strong>
+                            </div>
+                        </div>
+
+                        {% if analysis.vulnerability.indicators %}
+                            <div class="risk-indicators-list mt-3">
+                                <h4>Risk Indicators Detected:</h4>
+                                <ul>
+                                    {% for ind in analysis.vulnerability.indicators[:4] %}
+                                        <li>
+                                            <span class="ind-sev {{ ind.severity | lower }}">{{ ind.severity }}</span>
+                                            <span class="ind-text">{{ ind.context }}</span>
+                                            {% if ind.page %}
+                                                <span class="page-citation">[Page {{ ind.page }}]</span>
+                                            {% endif %}
+                                        </li>
+                                    {% endfor %}
+                                </ul>
+                            </div>
+                        {% else %}
+                            <div class="empty-risk-state mt-3 text-muted text-center">
+                                <i class="fa-solid fa-shield-check text-success"></i>
+                                <p>No security risk indicators detected.</p>
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <!-- 3. Key Findings & Important Sentences -->
+                <div class="dashboard-card card span-6" id="important-sentences-card">
+                    <div class="card-header flex-between">
+                        <h3><i class="fa-solid fa-star header-icon text-yellow"></i> Key Findings &amp; Important Points</h3>
+                        <div class="header-controls">
+                            <button class="btn btn-secondary btn-sm" onclick="fetchSimpleExplanation({{ analysis.id }})">
+                                <i class="fa-solid fa-wand-magic"></i> Explain Simply
+                            </button>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <div id="simple-explain-box" class="simple-explain-box" style="display: none;">
+                            <div class="flex-between">
+                                <h4 class="text-indigo"><i class="fa-solid fa-lightbulb"></i> Simplified Overview:</h4>
+                            </div>
+                            <p id="simple-explain-text" class="mt-2"></p>
+                            <div id="simple-explain-glossary" class="glossary-tags mt-1"></div>
+                        </div>
+
+                        <ul class="important-sentences-list mt-2" id="important-sentences-ul">
+                            {% for item in analysis.important_sentences %}
+                                <li data-original="{{ item.sentence }}">
+                                    <div class="imp-sent-header">
+                                        <span class="imp-score">Score: {{ item.score }}</span>
+                                        {% if item.page %}
+                                            <span class="page-citation">Page {{ item.page }}</span>
+                                        {% endif %}
+                                    </div>
+                                    <p class="imp-text">"{{ item.sentence }}"</p>
+                                </li>
+                            {% endfor %}
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- 4. Readability & Quality -->
+                <div class="dashboard-card card span-6" id="readability-card">
+                    <div class="card-header">
+                        <h3><i class="fa-solid fa-gauge-high header-icon text-emerald"></i> Readability &amp; Quality Analysis</h3>
+                    </div>
+                    <div class="card-body">
+                        <div class="readability-score-box text-center">
+                            <span class="read-score-num">{{ analysis.readability.flesch_reading_ease | round | int }}</span>
+                            <span class="read-score-denom">/ 100</span>
+                            <div class="read-level-tag">{{ analysis.readability.grade_level }}</div>
+                        </div>
+
+                        <ul class="stats-list mt-3">
+                            <li>
+                                <span>Quality Rating:</span>
+                                <strong>{{ analysis.readability.quality_rating }}</strong>
+                            </li>
+                            <li>
+                                <span>Sentence Complexity:</span>
+                                <strong>{{ analysis.readability.sentence_complexity }}</strong>
+                            </li>
+                            <li>
+                                <span>Vocabulary Diversity:</span>
+                                <strong>{{ analysis.readability.vocabulary_richness }}</strong>
+                            </li>
+                        </ul>
+                        <p class="text-muted text-sm mt-2">{{ analysis.readability.explanation }}</p>
+                    </div>
+                </div>
+
+                <!-- 5. Keyphrases & Themes -->
+                <div class="dashboard-card card span-6">
+                    <div class="card-header">
+                        <h3><i class="fa-solid fa-tags header-icon text-blue"></i> Keyphrases &amp; Terms</h3>
+                    </div>
+                    <div class="card-body">
+                        <div class="keywords-tags-container">
+                            {% for kw in analysis.keywords %}
+                                <span class="tag-badge">
+                                    <i class="fa-solid fa-tag"></i> 
+                                    {% if kw is mapping %}
+                                        {{ kw.phrase }} <small>({{ kw.frequency }})</small>
+                                    {% else %}
+                                        {{ kw }}
+                                    {% endif %}
+                                </span>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+
+                <div class="dashboard-card card span-6">
+                    <div class="card-header">
+                        <h3><i class="fa-solid fa-lightbulb header-icon text-purple"></i> Major Themes</h3>
+                    </div>
+                    <div class="card-body">
+                        <ul class="themes-list">
+                            {% for theme in analysis.themes %}
+                                <li>
+                                    <span class="theme-num">{{ loop.index }}</span>
+                                    <span class="theme-name">{{ theme }}</span>
+                                </li>
+                            {% endfor %}
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- 6. Visualisations -->
+                <div class="dashboard-card card span-6">
+                    <div class="card-header">
+                        <h3><i class="fa-solid fa-chart-bar header-icon text-emerald"></i> Word Frequency Distribution</h3>
+                    </div>
+                    <div class="card-body chart-container">
+                        <canvas id="wordFreqChart"></canvas>
+                    </div>
+                </div>
+
+                <div class="dashboard-card card span-6">
+                    <div class="card-header">
+                        <h3><i class="fa-solid fa-chart-pie header-icon text-pink"></i> Entity Distribution</h3>
+                    </div>
+                    <div class="card-body chart-container">
+                        <canvas id="entityDistChart"></canvas>
+                    </div>
+                </div>
+
+                <!-- 7. Named Entities Table -->
+                <div class="dashboard-card card span-12" id="entities-card">
+                    <div class="card-header flex-between">
+                        <h3><i class="fa-solid fa-address-book header-icon text-cyan"></i> Named Entities Recognition</h3>
+                        <input type="text" id="entity-search" placeholder="Search entity..." class="search-input">
+                    </div>
+                    
+                    <div class="entity-tabs">
+                        <button class="tab-btn active" onclick="filterEntities('ALL')">All ({{ analysis.entities.flat | length }})</button>
+                        {% for cat, list in analysis.entities.grouped.items() %}
+                            <button class="tab-btn" onclick="filterEntities('{{ cat | upper }}')">{{ cat }} ({{ list | length }})</button>
+                        {% endfor %}
+                    </div>
+                    
+                    <div class="card-body card-scrollable table-wrapper">
+                        {% if analysis.entities.flat %}
+                            <table class="data-table" id="entities-table">
+                                <thead>
+                                    <tr>
+                                        <th>Entity Name</th>
+                                        <th>Category</th>
+                                        <th>Frequency</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for ent in analysis.entities.flat %}
+                                        <tr data-category="{{ ent.type | upper }}">
+                                            <td class="entity-name font-semibold">{{ ent.name }}</td>
+                                            <td><span class="category-badge cat-{{ ent.type | lower }}">{{ ent.type }}</span></td>
+                                            <td class="font-mono text-center">{{ ent.count }}</td>
+                                        </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        {% else %}
+                            <div class="empty-state">
+                                <i class="fa-solid fa-users-slash text-muted"></i>
+                                <p>No named entities detected.</p>
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+
+            </div> <!-- /dashboard-grid -->
+            
+        </main>
+
+        <footer class="app-footer">
+            <p>&copy; 2026 SmartDoc NLP — Intelligent Local Document Analysis System. 100% Offline &amp; Secure.</p>
+        </footer>
+
+    </div>
+
+    <script>
+        // ── State ────────────────────────────────────────────────────────────
+        var currentSummaryEn = {{ analysis.summary | tojson }};
+        var currentSimEn = "";
+
+        // ── Copy Summary ─────────────────────────────────────────────────────
+        function copySummary() {
+            var text = document.getElementById("raw-summary-content").innerText;
+            navigator.clipboard.writeText(text).then(function() {
+                var icon = document.getElementById("copy-icon");
+                var label = document.getElementById("copy-text");
+                icon.className = "fa-solid fa-check text-success";
+                label.innerText = "Copied!";
+                setTimeout(function() {
+                    icon.className = "fa-regular fa-copy";
+                    label.innerText = "Copy";
+                }, 2000);
+            });
+        }
+
+        // ── Summary Level Change ─────────────────────────────────────────────
+        function changeSummaryLevel(analysisId, level, btn) {
+            // Highlight active pill
+            document.querySelectorAll(".level-pill").forEach(function(b) {
+                b.classList.remove("active");
+            });
+            btn.classList.add("active");
+
+            var summaryEl = document.getElementById("raw-summary-content");
+            var loadingEl = document.getElementById("summary-loading");
+            var errorEl   = document.getElementById("summary-error");
+
+            summaryEl.style.display = "none";
+            loadingEl.style.display = "block";
+            errorEl.style.display   = "none";
+
+            fetch("/api/summary/" + analysisId, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ level: level })
+            })
+            .then(function(res) {
+                if (!res.ok) {
+                    return res.json().then(function(e) { throw new Error(e.error || "Server error " + res.status); });
+                }
+                return res.json();
+            })
+            .then(function(data) {
+                loadingEl.style.display = "none";
+                summaryEl.style.display = "block";
+
+                if (data.success) {
+                    currentSummaryEn = data.summary;
+                    summaryEl.innerText = currentSummaryEn;
+                } else {
+                    errorEl.style.display = "block";
+                    console.error("[Summary] Backend error:", data.error);
+                }
+            })
+            .catch(function(err) {
+                loadingEl.style.display = "none";
+                summaryEl.style.display = "block";
+                errorEl.style.display   = "block";
+                console.error("[Summary] Fetch error:", err);
+            });
+        }
+
+        // ── Explain Simply ────────────────────────────────────────────────────
+        function fetchSimpleExplanation(analysisId) {
+            var box = document.getElementById("simple-explain-box");
+            box.style.display = "block";
+            document.getElementById("simple-explain-text").innerText = "Constructing simplified overview...";
+
+            fetch("/simple_explain/" + analysisId)
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                currentSimEn = data.explanation;
+                document.getElementById("simple-explain-text").innerText = data.explanation;
+
+                var glossDiv = document.getElementById("simple-explain-glossary");
+                glossDiv.innerHTML = "";
+                if (data.glossary_used && data.glossary_used.length > 0) {
+                    glossDiv.innerHTML = "<small>Terms simplified: " + data.glossary_used.join(", ") + "</small>";
+                }
+            });
+        }
+
+        // ── Entity Filter ─────────────────────────────────────────────────────
+        var currentFilter = "ALL";
+        function filterEntities(category) {
+            currentFilter = category;
+            document.querySelectorAll(".tab-btn").forEach(function(btn) {
+                btn.classList.toggle("active",
+                    (category === "ALL" && btn.innerText.toUpperCase().startsWith("ALL")) ||
+                    (category !== "ALL" && btn.innerText.toUpperCase().startsWith(category))
+                );
+            });
+            runSearchFilter();
+        }
+
+        document.getElementById("entity-search").addEventListener("input", runSearchFilter);
+
+        function runSearchFilter() {
+            var q = document.getElementById("entity-search").value.toLowerCase().trim();
+            document.querySelectorAll("#entities-table tbody tr").forEach(function(row) {
+                var name = row.querySelector(".entity-name").innerText.toLowerCase();
+                var cat  = row.getAttribute("data-category");
+                row.style.display =
+                    (name.indexOf(q) > -1) &&
+                    (currentFilter === "ALL" || cat === currentFilter) ? "" : "none";
+            });
+        }
+
+        // ── Charts ────────────────────────────────────────────────────────────
+        var chartWords  = {{ chart_words | tojson }};
+        var chartCounts = {{ chart_counts | tojson }};
+
+        if (chartWords.length > 0) {
+            new Chart(document.getElementById("wordFreqChart").getContext("2d"), {
+                type: "bar",
+                data: {
+                    labels: chartWords,
+                    datasets: [{
+                        label: "Frequency",
+                        data: chartCounts,
+                        backgroundColor: "rgba(99,102,241,0.65)",
+                        borderColor: "#6366f1",
+                        borderWidth: 1.5,
+                        borderRadius: 6
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        y: { beginAtZero: true, grid: { color: "rgba(255,255,255,0.08)" }, ticks: { color: "#94a3b8" } },
+                        x: { grid: { display: false }, ticks: { color: "#94a3b8" } }
+                    }
+                }
+            });
+        }
+
+        var entitiesGrouped = {{ analysis.entities.grouped | tojson }};
+        var entityLabels = [], entityData = [];
+        for (var cat in entitiesGrouped) {
+            entityLabels.push(cat);
+            entityData.push(entitiesGrouped[cat].length);
+        }
+
+        if (entityLabels.length > 0) {
+            new Chart(document.getElementById("entityDistChart").getContext("2d"), {
+                type: "doughnut",
+                data: {
+                    labels: entityLabels,
+                    datasets: [{
+                        data: entityData,
+                        backgroundColor: ["#6366f1","#a855f7","#3b82f6","#eab308","#10b981","#ec4899","#f97316"],
+                        borderColor: "#1e293b",
+                        borderWidth: 2
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { position: "right", labels: { color: "#e2e8f0" } } }
+                }
+            });
+        }
+    </script>
+</body>
+</html>

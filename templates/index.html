@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SmartDoc NLP - Intelligent Local Document Analysis System</title>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <!-- FontAwesome for Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <div class="glass-bg"></div>
+    <div class="app-container">
+        
+        <!-- Header -->
+        <header class="app-header">
+            <div class="logo">
+                <i class="fa-solid fa-brain-circuit brain-icon"></i>
+                <div class="brand">
+                    <h1>SmartDoc NLP</h1>
+                    <p class="subtitle">Intelligent Local Document Analysis System</p>
+                </div>
+            </div>
+            <nav class="nav-links">
+                <a href="{{ url_for('index') }}" class="active"><i class="fa-solid fa-home"></i> Home</a>
+                <a href="{{ url_for('compare') }}"><i class="fa-solid fa-code-compare"></i> Compare Docs</a>
+                <a href="{{ url_for('history') }}"><i class="fa-solid fa-history"></i> History</a>
+                <span class="user-badge"><i class="fa-solid fa-user-check"></i> {{ session.get('username', 'User') }}</span>
+                <a href="{{ url_for('logout') }}" class="btn-logout"><i class="fa-solid fa-right-from-bracket"></i> Logout</a>
+            </nav>
+        </header>
+
+        <!-- Main Content Area -->
+        <main class="main-content">
+            
+            <!-- Flash Messages -->
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    <div class="alerts-container">
+                        {% for category, message in messages %}
+                            <div class="alert alert-{{ category }}">
+                                <i class="fa-solid {% if category == 'error' %}fa-circle-xmark{% else %}fa-circle-check{% endif %}"></i>
+                                <span>{{ message }}</span>
+                                <button class="close-alert" onclick="this.parentElement.remove()">&times;</button>
+                            </div>
+                        {% endfor %}
+                    </div>
+                {% endif %}
+            {% endwith %}
+
+            <div class="intro-section card">
+                <h2>Local NLP Document Intelligence</h2>
+                <p>Upload a PDF, DOCX, or TXT document or paste raw text to run complete local NLP analytics: <strong>Extractive Summarization, Document Classification, Security & Risk Scanning, Local Q&A, Sentiment & Readability Analysis, Keyphrases, and PDF/DOCX Report Generation</strong>. 100% offline & secure.</p>
+            </div>
+
+            <!-- Analysis Setup Card -->
+            <section class="analysis-setup-card card">
+                <form id="analyze-form" action="{{ url_for('analyze') }}" method="POST" enctype="multipart/form-data">
+                    
+                    <!-- Custom Title Input — at the top -->
+                    <div class="options-container" style="margin-bottom: 1rem;">
+                        <div class="option-group" style="flex-direction: column; align-items: flex-start; gap: 0.4rem;">
+                            <label for="custom_title"><i class="fa-solid fa-pen-nib"></i> Analysis Title <span style="color: var(--text-muted); font-weight: 400;">(optional — shown in History)</span></label>
+                            <input
+                                type="text"
+                                id="custom_title"
+                                name="custom_title"
+                                placeholder="e.g. Student Mental Health Report Q3 2026"
+                                maxlength="120"
+                                autocomplete="off"
+                                style="width: 100%; background: rgba(255,255,255,0.05); border: 1px solid var(--border-color); border-radius: 8px; padding: 0.6rem 1rem; color: var(--text-main); font-size: 0.95rem; outline: none; transition: border-color 0.2s;"
+                                onfocus="this.style.borderColor='rgba(99,102,241,0.6)'"
+                                onblur="this.style.borderColor='var(--border-color)'"
+                            >
+                        </div>
+                    </div>
+
+                    <!-- Method Toggle (Paste Text or Upload File) -->
+                    <div class="method-toggle">
+                        <input type="radio" id="method-text" name="input_method" value="text" checked>
+                        <label for="method-text" class="toggle-btn active" id="btn-text">
+                            <i class="fa-solid fa-pen-to-square"></i> Paste Text
+                        </label>
+
+                        <input type="radio" id="method-file" name="input_method" value="file">
+                        <label for="method-file" class="toggle-btn" id="btn-file">
+                            <i class="fa-solid fa-file-arrow-up"></i> Upload Document
+                        </label>
+                    </div>
+
+                    <!-- Input Methods Section -->
+                    <div class="input-dynamic-container">
+                        
+                        <!-- Text Input Method -->
+                        <div id="text-input-section" class="input-panel active">
+                            <div class="textarea-wrapper">
+                                <textarea id="pasted_text" name="pasted_text" placeholder="Paste your article, research paper, technical doc, or essay here (minimum 5 words)..." rows="12"></textarea>
+                                <div class="textarea-footer">
+                                    <span id="char-counter">0 characters</span>
+                                    <span id="word-counter">0 words</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- File Input Method -->
+                        <div id="file-input-section" class="input-panel">
+                            <div class="file-upload-zone" id="drop-zone">
+                                <div class="file-icons-row">
+                                    <i class="fa-solid fa-file-pdf file-icon pdf-color"></i>
+                                    <i class="fa-solid fa-file-word file-icon docx-color"></i>
+                                    <i class="fa-solid fa-file-lines file-icon txt-color"></i>
+                                </div>
+                                <h3>Drag &amp; Drop your file here</h3>
+                                <p class="file-limits">Supported formats: <strong>PDF, DOCX, TXT</strong> (Max size: 10MB)</p>
+                                <span class="or-divider">or</span>
+                                <label for="file_upload" class="custom-file-upload">
+                                    Browse Files
+                                </label>
+                                <input type="file" id="file_upload" name="file_upload" accept=".pdf,.docx,.txt">
+                                <div id="file-details" class="file-details">
+                                    <span class="file-name" id="selected-file-name">No file selected</span>
+                                    <span class="file-size" id="selected-file-size"></span>
+                                    <button type="button" id="remove-file" class="remove-file-btn" style="display: none;">&times;</button>
+                                </div>
+                            </div>
+                        </div>
+
+                    </div>
+
+                    <!-- NLP Options Section -->
+                    <div class="options-container">
+                        <div class="option-group">
+                            <label for="summary_length"><i class="fa-solid fa-compress-arrows-alt"></i> Summary Ratio:</label>
+                            <div class="custom-select-wrapper">
+                                <select id="summary_length" name="summary_length">
+                                    <option value="short">Short (~10% of document)</option>
+                                    <option value="medium" selected>Medium (~20% of document)</option>
+                                    <option value="long">Long (~30% of document)</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Action Buttons -->
+                    <div class="form-actions">
+                        <button type="submit" class="btn btn-primary" id="analyze-btn">
+                            <i class="fa-solid fa-wand-magic-sparkles"></i> Run Intelligent NLP Analysis
+                        </button>
+                        <button type="button" class="btn btn-secondary" id="clear-btn">
+                            <i class="fa-solid fa-trash-can"></i> Clear Input
+                        </button>
+                    </div>
+
+                </form>
+            </section>
+
+        </main>
+
+        <!-- Footer -->
+        <footer class="app-footer">
+            <p>&copy; 2026 SmartDoc NLP — Intelligent Local Document Analysis System. 100% Offline & Secure.</p>
+        </footer>
+
+    </div>
+
+    <script src="{{ url_for('static', filename='js/script.js') }}"></script>
+</body>
+</html>
